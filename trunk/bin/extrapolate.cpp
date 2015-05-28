@@ -30,42 +30,57 @@ int main(int argc, char **argv)
 #endif
   CImg< unsigned char > I0;
   
-  options_description generalArgs("General options");
+  options_description generalArgs("general options");
   generalArgs.add_options()
-    ("help", "print usage")
-    ("version", "print version number");
+    ("help,h",    "print usage")
+    ("version,v", "print version number");
   
-  options_description reqArgs("Required arguments");
+  options_description reqArgs("positional arguments");
   reqArgs.add_options()
-    ("image", value< std::string >(), "image to extrapolate")
-    ("motionfield", value< std::string >(), "motion field to use")
-    ("numtimesteps", value< int >(), "number of images to extrapolate")
-    ("outprefix", value< std::string >(), "output file prefix");
+    ("image",        value< std::string >()->required(), "image to extrapolate")
+    ("motionfield",  value< std::string >()->required(), "motion field to use")
+    ("numtimesteps", value< int >()->required(),         "number of images to extrapolate")
+    ("outprefix",    value< std::string >()->required(), "output file prefix");
   
-  options_description allArgs("Usage: extrapolate <required arguments>");
+  positional_options_description posArgs;
+  posArgs.add("image", 1);
+  posArgs.add("motionfield", 1);
+  posArgs.add("numtimesteps", 1);
+  posArgs.add("outprefix", 1);
+  
+  options_description allArgs("Usage: extrapolate image motionfield numtimesteps outprefix");
   allArgs.add(generalArgs).add(reqArgs);
   
   std::string notes = "NOTE: If you use a dense motion field (.pdvm), it is assumed to be an inverse motion field (image2->image1).";
   
   try {
     variables_map vm;
-    store(parse_command_line(argc, argv, allArgs), vm);
-    notify(vm);
+    //store(parse_command_line(argc, argv, allArgs), vm);
+    command_line_parser cp = command_line_parser(argc, argv);
+    cp.options(allArgs);
+    cp.positional(posArgs);
+    store(cp.run(), vm);
+    //notify(vm);
     
-    if(vm.size() == 0 || vm.count("help"))
+    if(vm.size() == 1 && vm.count("help"))
     {
       std::cout<<allArgs<<std::endl;
       std::cout<<notes<<std::endl;
       return EXIT_SUCCESS;
     }
     else if(vm.count("version"))
+    {
       std::cout<<OPTFLOW_VERSION_INFO<<std::endl;
-    else if(!vm.count("image") || !vm.count("motionfield") || 
+      return EXIT_SUCCESS;
+    }
+    /*else if(!vm.count("image") || !vm.count("motionfield") || 
             !vm.count("numtimesteps") || !vm.count("outprefix"))
     {
       std::cout<<"One or more required arguments missing."<<std::endl;
       std::cout<<reqArgs<<std::endl;
-    }
+    }*/
+    
+    vm.notify();
     
     std::string imageFileName       = vm["image"].as< std::string >();
     std::string motionFieldFileName = vm["motionfield"].as< std::string >();
@@ -92,7 +107,7 @@ int main(int argc, char **argv)
     else
     {
       std::cout<<"Unknown motion field file extension."<<std::endl;
-      return EXIT_SUCCESS;
+      return EXIT_FAILURE;
     }
     
 #ifdef WITH_CGAL
@@ -106,10 +121,19 @@ int main(int argc, char **argv)
   }
   catch(CImgIOException &e1) {
     std::cout<<"Invalid source image(s)."<<std::endl;
+    return EXIT_FAILURE;
   }
-  catch(std::exception &e2) {
+  catch(required_option &e2) {
+    std::cout<<"One or more required arguments missing."<<std::endl;
     std::cout<<allArgs<<std::endl;
     std::cout<<notes<<std::endl;
+    return EXIT_FAILURE;
+  }
+  catch(std::exception &e3) {
+    /*std::cout<<allArgs<<std::endl;
+    std::cout<<notes<<std::endl;*/
+    std::cout<<e3.what()<<std::endl;
+    return EXIT_FAILURE;
   }
   
   delete denseExtrapolator;

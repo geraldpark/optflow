@@ -99,7 +99,11 @@ void Proesmans::compute(const CImg< unsigned char > &I1,
       repairEdges_(V_[0]);
       repairEdges_(V_[1]);
     }
+    
+    printProgressBar_(1.0*i / (NUM_ITERATIONS_ - 1));
   }
+  
+  std::cout<<std::endl;
 }
 
 Proesmans::BoundaryConditions Proesmans::getBoundaryConditions() const
@@ -292,6 +296,23 @@ void Proesmans::computeGradients_(const CImg< unsigned char > &I,
   
   G.get_shared_channel(0) = I.get_convolve(Kx, 0);
   G.get_shared_channel(1) = I.get_convolve(Ky, 0);
+}
+
+void Proesmans::printProgressBar_(double pct)
+{
+  cout<< "[";
+  int pos = 70 * pct;
+  for (int i = 0; i < 70; i++)
+  {
+    if (i < pos)
+      std::cout << "=";
+    else if (i == pos)
+      std::cout << ">";
+    else
+      std::cout << " ";
+  }
+  std::cout << "] " << int(pct * 100.0) << " %\r";
+  std::cout.flush();
 }
 
 void Proesmans::repairEdges_(CImg< double > &V)

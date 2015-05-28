@@ -45,8 +45,8 @@ namespace MotionExtractorDriver
       motionImageB->get_shared_channel(2) = I1_smoothed * 0.75;
     }
     
-    I1_smoothed.blur(3.0, 3.0, 3.0);
-    I2_smoothed.blur(3.0, 3.0, 3.0);
+    I1_smoothed.blur(1.0, 1.0, 1.0);  // 3.0
+    I2_smoothed.blur(1.0, 1.0, 1.0);
   }
   
   static void saveResultImages_(const string &srcFileName1,

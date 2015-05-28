@@ -29,32 +29,40 @@ int main(int argc, char **argv)
   SparseMotionExtractor *sparseMotionExtractor = NULL;
 #endif
   
-  options_description generalArgs("General options");
+  options_description generalArgs("general options");
   generalArgs.add_options()
-    ("help", "print usage")
-    ("options", value< std::string >(), "print options specific to the algorithm <arg>")
-    ("version", "print version number");
+    ("help,h",    "print usage")
+    ("options,o", value< std::string >(), "print options specific to the algorithm <arg>")
+    ("version,v", "print version number");
   
-  options_description mandatoryArgs("Mandatory arguments");
+  options_description mandatoryArgs("positional arguments");
   mandatoryArgs.add_options()
-    ("image1", value< std::string >(), "first image")
-    ("image2", value< std::string >(), "second image")
-    ("algorithm", value< std::string >(), "motion detection algorithm (lucaskanade, opencv, proesmans)")
-    ("outprefix", value< std::string >(), "output file prefix");
+    ("image1",    value< std::string >()->required(), "first image")
+    ("image2",    value< std::string >()->required(), "second image")
+    ("algorithm", value< std::string >()->required(), "motion detection algorithm (lucaskanade, opencv, proesmans)")
+    ("outprefix", value< std::string >()->required(), "output file prefix");
+  
+  positional_options_description posArgs;
+  posArgs.add("image1", 1);
+  posArgs.add("image2", 1);
+  posArgs.add("algorithm", 1);
+  posArgs.add("outprefix", 1);
+  
+  options_description optionalArgs("optional arguments");
+  optionalArgs.add_options()
+    ("numlevels", value< int >(), "number of pyramid levels (default = 4)");
   
   // options specific to the Lucas-Kanade algorithm
   options_description lucasKanadeArgs("Options for the Lucas-Kanade algorithm");
   lucasKanadeArgs.add_options()
-    ("numlevels",    value< int >(),   "number of pyramid levels (default = 4)")
     ("windowradius", value< int >(),   "feature matching window radius (default = 16)")
-    ("numiter",      value< int >(),   "number of iterations (default = 5)")
+    ("numlsqiter",   value< int >(),   "number of iterations (default = 5)")
     ("tau",          value< float >(), "eigenvalue threshold for feature matching (default = 0.0025)")
     ("sigmap",       value< float >(), "regularization parameter (default = 0)");
   
   // options specific to the Lucas-Kanade algorithm (OpenCV)
   options_description opencvArgs("Options for the Lucas-Kanade algorithm (OpenCV)");
   opencvArgs.add_options()
-    ("numlevels",    value< int >(),   "number of pyramid levels (default = 4)")
     ("windowsize",   value< int >(),   "feature matching window size (default = 30)")
     ("maxnumpoints", value< int >(),   "maximum number of feature points (default = 1000)")
     ("minpointdist", value< float >(), "minimum distance between feature points (default = 5)")
@@ -65,37 +73,41 @@ int main(int argc, char **argv)
   // options specific to the Proesmans algorithm
   options_description proesmansArgs("Options for the Proesmans algorithm");
   proesmansArgs.add_options()
-    ("numlevels", value< int >(),   "number of pyramid levels (default = 4)")
-    ("numiter",   value< int >(),   "number of iterations (default = 200)")
-    ("lambda",    value< float >(), "smoothness parameter (default = 100)")
-    ("boundcond", value< int >(),   "boundary conditions (0 = Dirichlet, 1 = Neumann)  (default = 1)");
+    ("numdiffiter", value< int >(),   "number of diffusion iterations (default = 200)")
+    ("lambda",      value< float >(), "smoothness parameter (default = 100)")
+    ("boundcond",   value< int >(),   "boundary conditions (0 = Dirichlet, 1 = Neumann) (default = 1)");
   
   std::string restrictions = "Restrictions:\n -the source images must be 8-bit grayscale images.";
   
   options_description allArgs("");
-  allArgs.add(generalArgs).add(mandatoryArgs).add(lucasKanadeArgs).add(proesmansArgs).add(opencvArgs);
-  options_description allVisibleArgs("Usage: extractmotion <required arguments> [algorithm-specific options]");
-  allVisibleArgs.add(generalArgs).add(mandatoryArgs);
+  allArgs.add(generalArgs).add(mandatoryArgs).add(optionalArgs).add(lucasKanadeArgs).add(proesmansArgs).add(opencvArgs);
+  options_description allVisibleArgs("Usage: extractmotion image1 image2 algorithm outprefix [algorithm-specific options]");
+  allVisibleArgs.add(generalArgs).add(mandatoryArgs).add(optionalArgs);
   
   try {
     variables_map vm;
-    store(parse_command_line(argc, argv, allArgs), vm);
-    notify(vm);
+    command_line_parser cp = command_line_parser(argc, argv);
+    cp.options(allArgs);
+    cp.positional(posArgs);
+    store(cp.run(), vm);
     
-    if(vm.size() == 0 || vm.count("help"))
+    if(vm.size() == 1 && vm.count("help"))
     {
       std::cout<<allVisibleArgs<<std::endl;
       std::cout<<restrictions<<std::endl;
       return EXIT_SUCCESS;
     }
-    else if(vm.count("version"))
+    else if(vm.size() == 1 && vm.count("version"))
+    {
       std::cout<<OPTFLOW_VERSION_INFO<<std::endl;
+      return EXIT_SUCCESS;
+    }
     else if(vm.count("options") && vm["options"].as< string >() == "lucaskanade")
     {
       std::cout<<lucasKanadeArgs<<std::endl;
       return EXIT_SUCCESS;
     }
-    else if(vm.count("options") && vm["options"].as< string >() == "opencv")
+    else if(vm.size() == 1 && vm.count("options") && vm["options"].as< string >() == "opencv")
     {
       std::cout<<opencvArgs<<std::endl;
       return EXIT_SUCCESS;
@@ -110,17 +122,21 @@ int main(int argc, char **argv)
       std::cout<<"Invalid algorithm name."<<std::endl;
       return EXIT_SUCCESS;
     }
-    else if(!vm.count("image1") || !vm.count("image2") || !vm.count("algorithm"))
+    /*else if(!vm.count("image1") || !vm.count("image2") || 
+            !vm.count("algorithm") || !vm.count("outprefix"))
     {
       std::cout<<"One or more required arguments missing."<<std::endl;
       std::cout<<mandatoryArgs<<std::endl;
-    }
+      return EXIT_FAILURE;
+    }*/
+    
+    vm.notify();
     
     if(vm["algorithm"].as< string >() == "lucaskanade")
     {
       denseMotionExtractor = new PyramidalLucasKanade(
         vm.count("windowradius") > 0 ? vm["windowradius"].as< int >() : 16,
-        vm.count("numiter") > 0      ? vm["numiter"].as< int >() : 5,
+        vm.count("numlsqiter") > 0   ? vm["numlsqiter"].as< int >() : 5,
         vm.count("tau") > 0          ? vm["tau"].as< float >() : 0.0025,
         vm.count("sigmap") > 0       ? vm["sigmap"].as< float >() : 0.0,
         vm.count("numlevels") > 0    ? vm["numlevels"].as< int >() : 4,
@@ -152,15 +168,15 @@ int main(int argc, char **argv)
         boundCond = Proesmans::NEUMANN;
       
       denseMotionExtractor = new PyramidalProesmans(
-        vm.count("numiter") > 0   ? vm["numiter"].as< int >() : 200,
-        vm.count("lamda") > 0     ? vm["lambda"].as< float >() : 100.0,
-        vm.count("numlevels") > 0 ? vm["numlevels"].as< int >() : 4,
+        vm.count("numdiffiter") > 0 ? vm["numdiffiter"].as< int >() : 200,
+        vm.count("lambda") > 0      ? vm["lambda"].as< float >() : 100.0,
+        vm.count("numlevels") > 0   ? vm["numlevels"].as< int >() : 4,
         boundCond);
     }
     else
     {
       std::cout<<"Invalid algorithm name."<<std::endl;
-      return EXIT_SUCCESS;
+      return EXIT_FAILURE;
     }
   
     std::string srcImgFileName1 = vm["image1"].as< string >();
@@ -184,10 +200,17 @@ int main(int argc, char **argv)
   }
   catch(CImgIOException &e1) {
     std::cout<<"Invalid source image(s)."<<std::endl;
+    return EXIT_FAILURE;
   }
-  catch(std::exception &e2) {
+  catch(required_option &e2) {
+    std::cout<<"One or more required arguments missing."<<std::endl;
     std::cout<<allVisibleArgs<<std::endl;
     std::cout<<restrictions<<std::endl;
+    return EXIT_FAILURE;
+  }
+  catch(std::exception &e3) {
+    std::cout<<e3.what()<<std::endl;
+    return EXIT_FAILURE;
   }
   
   return EXIT_SUCCESS;

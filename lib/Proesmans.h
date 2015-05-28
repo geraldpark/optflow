@@ -89,6 +89,8 @@ private:
                       double *avg,
                       double *result);
   
+  void printProgressBar_(double pct);
+  
   void repairEdges_(CImg< double > &V);
 };
 

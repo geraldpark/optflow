@@ -39,40 +39,54 @@ static void saveMotionImages(const CImg< unsigned char > &motionImage1,
 
 int main(int argc, char **argv)
 {
-  options_description generalArgs("General options");
+  options_description generalArgs("general options");
   generalArgs.add_options()
-    ("help", "print usage")
-    ("version", "print version number");
+    ("help,h", "print usage")
+    ("version,v", "print version number");
   
-  options_description reqArgs("Required arguments");
-  reqArgs.add_options()
-    ("image1", value< std::string >(), "first source image")
-    ("image2", value< std::string >(), "second source image")
-    ("numtimesteps", value< int >(), "number of intermediate images")
-    ("algorithm", value< std::string >(), "motion extraction algorithm to use (opencv, proesmans)")
-    ("outprefix", value< std::string >(), "output file prefix");
+  options_description mandatoryArgs("positional arguments");
+  mandatoryArgs.add_options()
+    ("image1", value< std::string >()->required(),    "first source image")
+    ("image2", value< std::string >()->required(),    "second source image")
+    ("numtimesteps", value< int >()->required(),      "number of intermediate images")
+    ("algorithm", value< std::string >()->required(), "motion extraction algorithm to use (opencv, proesmans)")
+    ("outprefix", value< std::string >()->required(), "output file prefix");
   
-  options_description allArgs("Usage: morph <required arguments>");
-  allArgs.add(generalArgs).add(reqArgs);
+  positional_options_description posArgs;
+  posArgs.add("image1", 1);
+  posArgs.add("image2", 1);
+  posArgs.add("numtimesteps", 1);
+  posArgs.add("algorithm", 1);
+  posArgs.add("outprefix", 1);
+  
+  options_description allArgs("Usage: morph image1 image2 numtimesteps algorithm outprefix");
+  allArgs.add(generalArgs).add(mandatoryArgs);
   
   try {
     variables_map vm;
-    store(parse_command_line(argc, argv, allArgs), vm);
-    notify(vm);
+    command_line_parser cp = command_line_parser(argc, argv);
+    cp.options(allArgs);
+    cp.positional(posArgs);
+    store(cp.run(), vm);
     
-    if(vm.size() == 0 || vm.count("help"))
+    if(vm.size() == 1 && vm.count("help"))
     {
       std::cout<<allArgs<<std::endl;
       return EXIT_SUCCESS;
     }
-    else if(vm.count("version"))
+    else if(vm.size() == 1 && vm.count("version"))
+    {
       std::cout<<OPTFLOW_VERSION_INFO<<std::endl;
-    else if(!vm.count("image1") || !vm.count("image2") || !vm.count("numtimesteps") || 
+      return EXIT_SUCCESS;
+    }
+    /*else if(!vm.count("image1") || !vm.count("image2") || !vm.count("numtimesteps") || 
             !vm.count("algorithm") || !vm.count("outprefix"))
     {
       std::cout<<"One or more required arguments missing."<<std::endl;
-      std::cout<<reqArgs<<std::endl;
-    }
+      std::cout<<mandatoryArgs<<std::endl;
+    }*/
+    
+    vm.notify();
     
     std::string image1FileName = vm["image1"].as< std::string >();
     std::string image2FileName = vm["image2"].as< std::string >();
@@ -154,14 +168,21 @@ int main(int argc, char **argv)
     else
     {
       std::cout<<"Invalid algorithm name."<<std::endl;
-      return EXIT_SUCCESS;
+      return EXIT_FAILURE;
     }
   }
   catch(CImgIOException &e1) {
     std::cout<<"Invalid source image(s)."<<std::endl;
+    return EXIT_FAILURE;
   }
-  catch(std::exception &e2) {
+  catch(required_option &e2) {
+    std::cout<<"One or more required arguments missing."<<std::endl;
     std::cout<<allArgs<<std::endl;
+    return EXIT_FAILURE;
+  }
+  catch(std::exception &e3) {
+    std::cout<<e3.what()<<std::endl;
+    return EXIT_FAILURE;
   }
   
   return EXIT_SUCCESS;

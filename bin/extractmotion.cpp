@@ -8,6 +8,7 @@
 #include "LucasKanadeOpenCV.h"
 #endif
 #include "MotionExtractorDriver.h"
+#include "PyramidalHornSchunck.h"
 #include "PyramidalLucasKanade.h"
 #include "PyramidalProesmans.h"
 #include "SparseImageExtrapolator.h"
@@ -52,6 +53,12 @@ int main(int argc, char **argv)
   optionalArgs.add_options()
     ("numlevels", value< int >(), "number of pyramid levels (default = 4)");
   
+  options_description hornSchunckArgs("Options for the Horn&Schunck algorithm");
+  hornSchunckArgs.add_options()
+    ("numiter",    value< int >(),   "number of Gauss-Seidel/SOR iterations")
+    ("alpha",      value< float >(), "smoothness parameters")
+    ("relaxcoeff", value< float >(), "SOR relaxation coefficient");
+  
   // options specific to the Lucas-Kanade algorithm
   options_description lucasKanadeArgs("Options for the Lucas-Kanade algorithm");
   lucasKanadeArgs.add_options()
@@ -80,7 +87,8 @@ int main(int argc, char **argv)
   std::string restrictions = "Restrictions:\n -the source images must be 8-bit grayscale images.";
   
   options_description allArgs("");
-  allArgs.add(generalArgs).add(mandatoryArgs).add(optionalArgs).add(lucasKanadeArgs).add(proesmansArgs).add(opencvArgs);
+  allArgs.add(generalArgs).add(mandatoryArgs).add(hornSchunckArgs).
+          add(optionalArgs).add(lucasKanadeArgs).add(proesmansArgs).add(opencvArgs);
   options_description allVisibleArgs("Usage: extractmotion image1 image2 algorithm outprefix [algorithm-specific options]");
   allVisibleArgs.add(generalArgs).add(mandatoryArgs).add(optionalArgs);
   
@@ -100,6 +108,11 @@ int main(int argc, char **argv)
     else if(vm.size() == 1 && vm.count("version"))
     {
       std::cout<<OPTFLOW_VERSION_INFO<<std::endl;
+      return EXIT_SUCCESS;
+    }
+    else if(vm.count("options") && vm["options"].as< string >() == "hornschunck")
+    {
+      std::cout<<hornSchunckArgs<<std::endl;
       return EXIT_SUCCESS;
     }
     else if(vm.count("options") && vm["options"].as< string >() == "lucaskanade")
@@ -132,7 +145,26 @@ int main(int argc, char **argv)
     
     vm.notify();
     
-    if(vm["algorithm"].as< string >() == "lucaskanade")
+    if(vm["algorithm"].as< string >() == "hornschunck")
+    {
+      HornSchunck::BoundaryConditions boundCond;
+      
+      int bc = 1;
+      if(vm.count("boundcond") > 0)
+        bc = vm["boundcond"].as< int >();
+      if(bc == 0)
+        boundCond = HornSchunck::DIRICHLET;
+      else
+        boundCond = HornSchunck::NEUMANN;
+      
+      denseMotionExtractor = new PyramidalHornSchunck(
+        vm.count("numiter") > 0    ? vm["numiter"].as< int >() : 500,
+        vm.count("alpha") > 0      ? vm["alpha"].as< float >() : 0.7,
+        vm.count("relaxcoeff") > 0 ? vm["relaxcoeff"].as< float >() : 1.9,
+        vm.count("numlevels") > 0  ? vm["numlevels"].as< int >() : 4,
+        boundCond);
+    }
+    else if(vm["algorithm"].as< string >() == "lucaskanade")
     {
       denseMotionExtractor = new PyramidalLucasKanade(
         vm.count("windowradius") > 0 ? vm["windowradius"].as< int >() : 16,

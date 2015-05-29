@@ -25,13 +25,13 @@ PyramidalProesmans::~PyramidalProesmans()
 void PyramidalProesmans::printInfoText() const
 {
   Proesmans *me = dynamic_cast< Proesmans * >(motionExtractor);
-	
+  
   cout<<"Pyramidal Proesmans optical flow algorithm"<<endl;
   cout<<"=========================================="<<endl;
   
   cout<<"Input image width: "<<baseWidth<<endl;
   cout<<"Input image height: "<<baseHeight<<endl;
-	
+  
   cout<<"Number of iteration steps: "<<me->getNumIterations()<<endl;
   cout<<"Lambda: "<<me->getLambda()<<endl;
   cout<<"Number of pyramid levels: "<<NUMLEVELS<<endl;

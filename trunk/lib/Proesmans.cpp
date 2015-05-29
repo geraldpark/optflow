@@ -340,6 +340,6 @@ void Proesmans::repairEdges_(CImg< double > &V)
     V(0, 0, i) = V(1, 1, i);
     V(width_ - 1, 0, i) = V(width_ - 2, 1, i);
     V(0, height_ - 1, i) = V(1, height_ - 2, i);
-    V(width_ - 1, height_ - 1, i) = V(width_ - 2, height_ - 2);
+    V(width_ - 1, height_ - 1, i) = V(width_ - 2, height_ - 2, i);
   }
 }
